@@ -1,7 +1,9 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from models import SanPham, ChatLieu
+from flask_cors import CORS  # You'll need to install this: pip install flask-cors
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 
 # Endpoint lấy thông tin của toàn bộ sản phẩm
@@ -183,6 +185,16 @@ def get_all_materials():
             'success': False,
             'error': str(e)
         }), 500
+
+
+# Serve static files
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/<path:path>')
+def static_files(path):
+    return send_from_directory('static', path)
 
 
 if __name__ == '__main__':
