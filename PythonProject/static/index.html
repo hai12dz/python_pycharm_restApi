@@ -147,6 +147,104 @@
             font-style: italic;
             color: #666;
         }
+
+        .search-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .search-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-secondary {
+            background-color: #607d8b;
+            color: white;
+        }
+
+        .btn-export {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .badge-success {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .badge-warning {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .badge-danger {
+            background-color: #f44336;
+            color: white;
+        }
+
+        @media screen and (max-width: 768px) {
+
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
+                display: block;
+            }
+
+            thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+
+            tr {
+                margin-bottom: 15px;
+                border: 1px solid #ddd;
+            }
+
+            td {
+                border: none;
+                position: relative;
+                padding-left: 50%;
+                text-align: right;
+            }
+
+            td:before {
+                position: absolute;
+                top: 12px;
+                left: 12px;
+                width: 45%;
+                padding-right: 10px;
+                white-space: nowrap;
+                text-align: left;
+                font-weight: bold;
+                content: attr(data-label);
+            }
+        }
     </style>
 </head>
 
@@ -155,6 +253,22 @@
         <h1>Quản lý sản phẩm</h1>
 
         <div id="notification" class="notification"></div>
+
+        <!-- Search form -->
+        <div class="search-container">
+            <div class="search-group">
+                <label for="searchName">Tên sản phẩm:</label>
+                <input type="text" id="searchName" placeholder="Nhập tên sản phẩm...">
+            </div>
+            <div class="search-group">
+                <label for="searchMaterial">Chất liệu:</label>
+                <input type="text" id="searchMaterial" placeholder="Nhập tên chất liệu...">
+            </div>
+            <div>
+                <button id="searchButton" class="btn btn-primary">Tìm kiếm</button>
+                <button id="resetSearchButton" class="btn btn-reset">Xóa bộ lọc</button>
+            </div>
+        </div>
 
         <!-- Form for adding/editing products -->
         <div class="form-container">
@@ -202,6 +316,13 @@
             </form>
         </div>
 
+        <!-- Button group for inventory actions -->
+        <div class="button-group">
+            <button id="showAllButton" class="btn btn-secondary">Hiển thị tất cả sản phẩm</button>
+            <button id="showInventoryButton" class="btn btn-secondary">Chỉ hiển thị hàng tồn kho</button>
+            <button id="exportInventoryButton" class="btn btn-export">Xuất danh sách hàng tồn kho</button>
+        </div>
+
         <!-- Table for displaying products -->
         <div class="table-container">
             <h2>Danh sách sản phẩm</h2>
@@ -243,6 +364,17 @@
             const loadingIndicator = document.getElementById('loading');
             const chatLieuSelect = document.getElementById('chatLieu');
 
+            // Search elements
+            const searchName = document.getElementById('searchName');
+            const searchMaterial = document.getElementById('searchMaterial');
+            const searchButton = document.getElementById('searchButton');
+            const resetSearchButton = document.getElementById('resetSearchButton');
+
+            // Inventory buttons
+            const showAllButton = document.getElementById('showAllButton');
+            const showInventoryButton = document.getElementById('showInventoryButton');
+            const exportInventoryButton = document.getElementById('exportInventoryButton');
+
             // Track if we're in edit mode
             let isEditMode = false;
 
@@ -280,35 +412,7 @@
                         loadingIndicator.style.display = 'none';
 
                         if (result.success) {
-                            const products = result.data;
-                            const tableBody = productsTable.querySelector('tbody');
-                            tableBody.innerHTML = '';
-
-                            products.forEach(product => {
-                                const row = document.createElement('tr');
-
-                                row.innerHTML = `
-                                    <td>${product.MaSP}</td>
-                                    <td>${product.TenSP}</td>
-                                    <td>${product.ChatLieu}</td>
-                                    <td>${product.MoTa || ''}</td>
-                                    <td>${formatCurrency(product.GiaNhap)}</td>
-                                    <td>${formatCurrency(product.GiaBan)}</td>
-                                    <td>${product.SoLuong}</td>
-                                    <td>
-                                        <button class="action-btn edit-btn" data-id="${product.MaSP}">Sửa</button>
-                                        <button class="action-btn delete-btn" data-id="${product.MaSP}">Xóa</button>
-                                    </td>
-                                `;
-
-                                tableBody.appendChild(row);
-                            });
-
-                            // Show the table
-                            productsTable.style.display = 'table';
-
-                            // Add event listeners to the buttons
-                            addButtonEventListeners();
+                            displayProducts(result.data);
                         } else {
                             showNotification(result.error, false);
                         }
@@ -318,6 +422,59 @@
                         console.error('Error loading products:', error);
                         showNotification('Không thể tải danh sách sản phẩm', false);
                     });
+            }
+
+            // Display products in the table
+            function displayProducts(products) {
+                const tableBody = productsTable.querySelector('tbody');
+                tableBody.innerHTML = '';
+
+                if (products.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Không tìm thấy sản phẩm nào</td></tr>';
+                    productsTable.style.display = 'table';
+                    return;
+                }
+
+                products.forEach(product => {
+                    const row = document.createElement('tr');
+                    const stockStatus = getStockStatus(product.SoLuong);
+
+                    row.innerHTML = `
+                        <td data-label="ID">${product.MaSP}</td>
+                        <td data-label="Tên sản phẩm">${product.TenSP}</td>
+                        <td data-label="Chất liệu">${product.ChatLieu}</td>
+                        <td data-label="Mô tả">${product.MoTa || ''}</td>
+                        <td data-label="Giá nhập">${formatCurrency(product.GiaNhap)}</td>
+                        <td data-label="Giá bán">${formatCurrency(product.GiaBan)}</td>
+                        <td data-label="Số lượng">
+                            ${product.SoLuong}
+                            <span class="badge ${stockStatus.class}">${stockStatus.text}</span>
+                        </td>
+                        <td data-label="Thao tác">
+                            <button class="action-btn edit-btn" data-id="${product.MaSP}">Sửa</button>
+                            <button class="action-btn delete-btn" data-id="${product.MaSP}">Xóa</button>
+                        </td>
+                    `;
+
+                    tableBody.appendChild(row);
+                });
+
+                // Show the table
+                productsTable.style.display = 'table';
+
+                // Add event listeners to the buttons
+                addButtonEventListeners();
+            }
+
+            // Get stock status badge
+            function getStockStatus(quantity) {
+                if (quantity <= 0) {
+                    return { class: 'badge-danger', text: 'Hết hàng' };
+                } else if (quantity <= 10) {
+                    return { class: 'badge-warning', text: 'Sắp hết' };
+                } else {
+                    return { class: 'badge-success', text: 'Còn hàng' };
+                }
             }
 
             // Add event listeners to edit and delete buttons
@@ -346,7 +503,11 @@
                         document.getElementById('moTa').value = cells[3].textContent;
                         document.getElementById('giaNhap').value = parseFloat(cells[4].textContent.replace(/[^\d.-]/g, ''));
                         document.getElementById('giaBan').value = parseFloat(cells[5].textContent.replace(/[^\d.-]/g, ''));
-                        document.getElementById('soLuong').value = cells[6].textContent;
+
+                        // Extract the quantity (remove the badge text)
+                        const quantityText = cells[6].textContent.trim();
+                        const quantity = parseInt(quantityText);
+                        document.getElementById('soLuong').value = quantity;
 
                         // Change form to edit mode
                         formTitle.textContent = 'Chỉnh sửa sản phẩm';
@@ -391,6 +552,138 @@
                     createProduct(productData);
                 }
             });
+
+            // Search for products
+            searchButton.addEventListener('click', function () {
+                const tenSP = searchName.value.trim();
+                const tenCL = searchMaterial.value.trim();
+
+                loadingIndicator.style.display = 'block';
+                productsTable.style.display = 'none';
+
+                fetch(`${PRODUCTS_API}/search?ten_sp=${encodeURIComponent(tenSP)}&ten_cl=${encodeURIComponent(tenCL)}`)
+                    .then(response => response.json())
+                    .then(result => {
+                        loadingIndicator.style.display = 'none';
+
+                        if (result.success) {
+                            displayProducts(result.data);
+                            showNotification(`Tìm thấy ${result.count} sản phẩm`, true);
+                        } else {
+                            showNotification(result.error, false);
+                        }
+                    })
+                    .catch(error => {
+                        loadingIndicator.style.display = 'none';
+                        console.error('Error searching products:', error);
+                        showNotification('Không thể tìm kiếm sản phẩm', false);
+                    });
+            });
+
+            // Reset search
+            resetSearchButton.addEventListener('click', function () {
+                searchName.value = '';
+                searchMaterial.value = '';
+                loadProducts();
+            });
+
+            // Show only inventory products
+            showInventoryButton.addEventListener('click', function () {
+                loadingIndicator.style.display = 'block';
+                productsTable.style.display = 'none';
+
+                fetch(`${PRODUCTS_API}/available`)
+                    .then(response => response.json())
+                    .then(result => {
+                        loadingIndicator.style.display = 'none';
+
+                        if (result.success) {
+                            displayProducts(result.data);
+                            showNotification(`Hiển thị ${result.count} sản phẩm tồn kho`, true);
+                        } else {
+                            showNotification(result.error, false);
+                        }
+                    })
+                    .catch(error => {
+                        loadingIndicator.style.display = 'none';
+                        console.error('Error loading inventory:', error);
+                        showNotification('Không thể tải danh sách tồn kho', false);
+                    });
+            });
+
+            // Show all products
+            showAllButton.addEventListener('click', function () {
+                loadProducts();
+            });
+
+            // Export inventory to CSV
+            exportInventoryButton.addEventListener('click', function () {
+                fetch(`${PRODUCTS_API}/available`)
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            exportToCSV(result.data, 'danh_sach_ton_kho.csv');
+                            showNotification('Xuất danh sách tồn kho thành công', true);
+                        } else {
+                            showNotification(result.error, false);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error exporting inventory:', error);
+                        showNotification('Không thể xuất danh sách tồn kho', false);
+                    });
+            });
+
+            // Export data to CSV file
+            function exportToCSV(data, filename) {
+                if (!data || !data.length) {
+                    showNotification('Không có dữ liệu để xuất', false);
+                    return;
+                }
+
+                // CSV headers
+                const headers = [
+                    'ID',
+                    'Tên sản phẩm',
+                    'Chất liệu',
+                    'Mô tả',
+                    'Giá nhập (VNĐ)',
+                    'Giá bán (VNĐ)',
+                    'Số lượng tồn'
+                ];
+
+                // Format data for CSV
+                const rows = data.map(item => [
+                    item.MaSP,
+                    item.TenSP,
+                    item.ChatLieu,
+                    item.MoTa || '',
+                    item.GiaNhap,
+                    item.GiaBan,
+                    item.SoLuong
+                ]);
+
+                // Combine headers and rows
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(row => row.map(cell =>
+                        typeof cell === 'string' && (cell.includes(',') || cell.includes('"'))
+                            ? `"${cell.replace(/"/g, '""')}"`
+                            : cell
+                    ).join(','))
+                ].join('\n');
+
+                // Create download link
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
 
             // Create a new product
             function createProduct(productData) {
